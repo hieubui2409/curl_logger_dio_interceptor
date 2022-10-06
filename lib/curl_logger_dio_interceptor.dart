@@ -55,13 +55,26 @@ class CurlLoggerDioInterceptor extends Interceptor {
     });
 
     if (options.data != null) {
-      // FormData can't be JSON-serialized, so keep only their fields attributes
-      if (options.data is FormData && convertFormData == true) {
-        options.data = Map.fromEntries(options.data.fields);
+      if (options.data is FormData) {
+        if (convertFormData) {
+          final fieldData = Map.fromEntries(options.data.fields);
+          fieldData.forEach((key, value) {
+            components.add('--form $key="$value"');
+          });
+          final fileData = Map.fromEntries(options.data.files);
+          fileData.forEach((key, value) {
+            // can show file name only
+            components.add('--form =@"${(value as MultipartFile).filename}"');
+          });
+        }
+      } else if (options.headers['content-type'] == 'application/x-www-form-urlencoded') {
+        options.data.forEach((k, v) {
+          components.add('-d "$k=$v"');
+        });
+      } else {
+        final data = json.encode(options.data).replaceAll('"', '\\"');
+        components.add('-d "$data"');
       }
-
-      final data = json.encode(options.data).replaceAll('"', '\\"');
-      components.add('-d "$data"');
     }
 
     components.add('"${options.uri.toString()}"');
